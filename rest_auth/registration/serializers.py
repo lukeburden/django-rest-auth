@@ -1,4 +1,4 @@
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponseBadRequest
 from rest_framework import serializers
 from requests.exceptions import HTTPError
 from allauth.socialaccount.helpers import complete_social_login
@@ -35,9 +35,13 @@ class SocialLoginSerializer(serializers.Serializer):
                                                 response=access_token)
 
             login.token = token
-            complete_social_login(request, login)
-        except HTTPError:
-            raise serializers.ValidationError('Incorrect value')
+            """ If the adapter is customised, we can get immediate responses
+            specified here. """
+            response = complete_social_login(request, login)
+            if response.__class__ in (HttpResponseBadRequest,):
+                raise serializers.ValidationError(response.content)
+        except HTTPError,e:
+            raise serializers.ValidationError(e.response.content)
 
         if not login.is_existing:
             login.lookup()
